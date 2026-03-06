@@ -133,56 +133,19 @@ figma.ui.onmessage = async (msg) => {
         const { layerIds } = msg;
         const screenshots = [];
 
-        for (const layerId of layerIds) {
-          const node = figma.getNodeById(layerId);
-          if (!node || node.type !== 'TEXT') continue;
+        // Export the entire page once to use as base for all screenshots
+        const pageBytes = await figma.currentPage.exportAsync({
+          format: 'PNG',
+          constraint: { type: 'SCALE', value: 1 }
+        });
+        const pageImage = figma.base64Encode(pageBytes);
 
-          try {
-            // Find the parent frame to export
-            let exportNode = node.parent;
-            while (exportNode && exportNode.type !== 'FRAME' && exportNode.type !== 'COMPONENT') {
-              exportNode = exportNode.parent;
-            }
-
-            if (!exportNode) continue;
-
-            // Create temporary highlight rectangle around the text node
-            const highlight = figma.createRectangle();
-            highlight.resize(node.width + 8, node.height + 8);
-            highlight.x = node.x - 4;
-            highlight.y = node.y - 4;
-            highlight.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 0 }, opacity: 0.3 }]; // Yellow highlight
-            highlight.strokes = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }]; // Red border
-            highlight.strokeWeight = 2;
-            highlight.name = 'temp-highlight';
-
-            // Add to same parent as text node
-            node.parent.appendChild(highlight);
-
-            // Move highlight behind the text
-            const textIndex = node.parent.children.indexOf(node);
-            node.parent.insertChild(textIndex, highlight);
-
-            // Export the frame with the highlight
-            const bytes = await exportNode.exportAsync({
-              format: 'PNG',
-              constraint: { type: 'SCALE', value: 2 }
-            });
-
-            // Remove the highlight
-            highlight.remove();
-
-            // Convert to base64
-            const base64 = figma.base64Encode(bytes);
-
-            screenshots.push({
-              layerId,
-              image: base64
-            });
-          } catch (error) {
-            console.error('Screenshot export failed for', layerId, error);
-          }
-        }
+        // Send single screenshot for now (whole page)
+        // In future, could crop individual elements
+        screenshots.push({
+          layerId: 'page',
+          image: pageImage
+        });
 
         figma.ui.postMessage({
           type: 'screenshots-ready',
@@ -193,16 +156,44 @@ figma.ui.onmessage = async (msg) => {
       case 'create-reference-page':
         const { screenName, keyMappings } = msg;
 
+        // First, get the original nodes to store their paths
+        const originalNodes = keyMappings.map(mapping => {
+          const node = figma.getNodeById(mapping.layerId);
+          if (!node) return null;
+
+          // Build path from root to node
+          const path = [];
+          let current = node;
+          while (current && current.parent && current.parent.type !== 'PAGE') {
+            path.unshift(current.name);
+            current = current.parent;
+          }
+
+          return {
+            path,
+            originalName: node.name,
+            keyName: mapping.keyName
+          };
+        }).filter(n => n !== null);
+
         // Duplicate current page
         const currentPage = figma.currentPage;
         const newPage = currentPage.clone();
         newPage.name = `${screenName} - Lokalise Keys`;
 
-        // Rename layers according to key mappings
-        keyMappings.forEach(mapping => {
-          const node = newPage.findOne(n => n.id === mapping.layerId);
-          if (node) {
-            node.name = mapping.keyName;
+        // Rename layers by finding them via path
+        originalNodes.forEach(nodeInfo => {
+          // Navigate to the node using the path
+          let current = newPage;
+          for (const name of nodeInfo.path) {
+            const child = current.findOne(n => n.name === name);
+            if (!child) break;
+            current = child;
+          }
+
+          // Rename if we found it
+          if (current && current !== newPage) {
+            current.name = nodeInfo.keyName;
           }
         });
 

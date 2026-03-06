@@ -47,14 +47,19 @@ class LokaliseClient {
   }
 
   async uploadScreenshot(keyIds, base64Image, title = 'Screenshot') {
+    // Lokalise expects base64 with data URI prefix
+    const imageData = base64Image.startsWith('data:')
+      ? base64Image
+      : `data:image/png;base64,${base64Image}`;
+
     // Upload screenshot and link to keys
     const response = await axios.post(
       `${LOKALISE_API}/projects/${this.projectId}/screenshots`,
       {
         screenshots: [{
-          data: base64Image, // base64 encoded image
+          data: imageData,
           title: title,
-          key_ids: keyIds,  // Array of key IDs to link to
+          key_ids: keyIds,
           tags: ['figma-export']
         }]
       },
@@ -75,6 +80,9 @@ class LokaliseClient {
         results.push({ success: true, ...result });
       } catch (error) {
         console.error('Screenshot upload failed:', error.message);
+        if (error.response) {
+          console.error('Screenshot error details:', JSON.stringify(error.response.data, null, 2));
+        }
         results.push({ success: false, error: error.message });
       }
     }

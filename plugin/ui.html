@@ -919,7 +919,7 @@
 
         async function handleScreenshotsReady(screenshots) {
             document.getElementById('export-status').textContent = 'Exporting to Lokalise...';
-            document.getElementById('export-substatus').textContent = `Uploading ${state.keys.length} keys and ${screenshots.length} screenshots`;
+            document.getElementById('export-substatus').textContent = `Uploading ${state.keys.length} keys with screenshot`;
 
             try {
                 // Prepare layer mappings for reference page
@@ -928,11 +928,12 @@
                     keyName: key.key_name
                 }));
 
-                // Prepare screenshots with key index
-                const screenshotsWithIndex = screenshots.map((screenshot, index) => ({
-                    ...screenshot,
-                    keyIndex: index
-                }));
+                // Single screenshot for entire screen
+                const pageScreenshot = screenshots.length > 0 ? {
+                    image: screenshots[0].image,
+                    title: `${state.screenName} - Full Screen`,
+                    keyIndexes: state.keys.map((_, idx) => idx) // Link to all keys
+                } : null;
 
                 // Call backend API to export to Lokalise
                 const response = await fetch('http://localhost:3000/api/export', {
@@ -940,7 +941,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         keys: state.keys,
-                        screenshots: screenshotsWithIndex,
+                        screenshot: pageScreenshot,
                         screenName: state.screenName,
                         projectKey: state.projectKey,
                         epicKey: state.epicKey || null,
@@ -972,7 +973,7 @@
                     state.epicKey ? 'JIRA ticket created and linked to epic' : 'JIRA ticket created';
 
                 document.getElementById('stat-keys').textContent = state.keys.length;
-                document.getElementById('stat-linked').textContent = result.screenshotsUploaded || 0;
+                document.getElementById('stat-linked').textContent = result.screenshotUploaded || 0;
 
                 document.getElementById('jira-link').textContent = result.jiraTicket.key;
                 document.getElementById('lokalise-link').textContent = `Lokalise Project`;

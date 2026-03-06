@@ -23,7 +23,7 @@ const jiraClient = new JiraClient(
 // Export endpoint
 app.post('/api/export', async (req, res) => {
   try {
-    const { keys, screenshots, screenName, projectKey, epicKey, fileKey, layerMappings } = req.body;
+    const { keys, screenshot, screenName, projectKey, epicKey, fileKey, layerMappings } = req.body;
 
     console.log(`📤 Exporting ${keys.length} keys to Lokalise...`);
 
@@ -32,25 +32,33 @@ app.post('/api/export', async (req, res) => {
     const createdKeys = lokaliseResult.keys || [];
     console.log(`✓ Created ${keys.length} keys in Lokalise`);
 
-    // Upload screenshots if provided
-    if (screenshots && screenshots.length > 0) {
-      console.log(`📸 Uploading ${screenshots.length} screenshots...`);
+    let screenshotUploaded = false;
 
-      // Map screenshots to key IDs
-      const screenshotsWithKeyIds = screenshots.map(screenshot => {
-        // Find the created key ID for this screenshot
-        const keyIndex = screenshot.keyIndex;
-        const createdKey = createdKeys[keyIndex];
+    // Upload screenshot if provided
+    if (screenshot && screenshot.image) {
+      console.log(`📸 Uploading screenshot linked to ${screenshot.keyIndexes.length} keys...`);
 
-        return {
-          keyIds: createdKey ? [createdKey.key_id] : [],
-          image: screenshot.image,
-          title: `${screenName} - ${keys[keyIndex].key_name}`
-        };
-      }).filter(s => s.keyIds.length > 0);
+      // Get all key IDs from the created keys
+      const keyIds = screenshot.keyIndexes
+        .map(idx => createdKeys[idx]?.key_id)
+        .filter(id => id);
 
-      const screenshotResults = await lokaliseClient.bulkUploadScreenshots(screenshotsWithKeyIds);
-      console.log(`✓ Uploaded ${screenshotResults.filter(r => r.success).length}/${screenshots.length} screenshots`);
+      if (keyIds.length > 0) {
+        try {
+          await lokaliseClient.uploadScreenshot(
+            keyIds,
+            screenshot.image,
+            screenshot.title
+          );
+          console.log(`✓ Screenshot uploaded and linked to ${keyIds.length} keys`);
+          screenshotUploaded = true;
+        } catch (error) {
+          console.error(`Screenshot upload failed:`, error.message);
+          if (error.response) {
+            console.error('Error details:', JSON.stringify(error.response.data, null, 2));
+          }
+        }
+      }
     }
 
     // Generate JIRA ticket description
@@ -84,7 +92,7 @@ app.post('/api/export', async (req, res) => {
       },
       lokaliseUrl,
       linkedKeys: 0,
-      screenshotsUploaded: screenshots ? screenshots.length : 0,
+      screenshotUploaded: screenshotUploaded ? 1 : 0,
       layerMappings: layerMappings || []
     });
 
