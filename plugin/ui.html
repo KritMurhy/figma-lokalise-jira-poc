@@ -730,9 +730,9 @@
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // Generate keys WITHOUT duplicate handling
+            // Use parent component/group as the "Group" part of the key
             state.keys = state.layers.map((layer, index) => {
-                const pathParts = layer.path.split(' / ');
-                const groupName = pathParts[pathParts.length - 2] || 'Root';
+                const groupName = layer.parentComponent || 'Root';
                 const keyName = generateKeyName(state.screenName, groupName, layer.name);
 
                 return {
@@ -782,20 +782,22 @@
             duplicateGroups.forEach(([originalName, keys]) => {
                 keys.forEach((key, idx) => {
                     const suggestedName = idx === 0 ? originalName : `${originalName}_${idx + 1}`;
+                    const layer = state.layers[key.layerIndex];
+                    const parentInfo = layer ? `Parent: ${layer.parentComponent || 'Unknown'}` : '';
 
                     const card = document.createElement('div');
                     card.className = 'duplicate-card';
                     card.innerHTML = `
                         <div class="duplicate-header">Duplicate ${idx + 1} of ${keys.length}: ${originalName}</div>
+                        <div style="font-size: 11px; color: #999; margin-bottom: 8px;">
+                            ${parentInfo} | Text: "${key.text}"
+                        </div>
                         <div class="duplicate-input-group">
                             <label>New unique name:</label>
                             <input type="text"
                                    class="duplicate-input"
                                    data-index="${key.index}"
                                    value="${suggestedName}">
-                        </div>
-                        <div style="font-size: 11px; color: #666; margin-top: 4px;">
-                            Text: "${key.text}"
                         </div>
                     `;
                     listEl.appendChild(card);

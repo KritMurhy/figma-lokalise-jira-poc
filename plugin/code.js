@@ -38,18 +38,40 @@ function getNodePath(node) {
   return path.join(' / ');
 }
 
+function getParentComponentOrGroup(node) {
+  // Find the first parent that is a COMPONENT, INSTANCE, or GROUP
+  let current = node.parent;
+  while (current && current.type !== 'PAGE') {
+    if (current.type === 'COMPONENT' ||
+        current.type === 'INSTANCE' ||
+        current.type === 'GROUP' ||
+        current.type === 'FRAME') {
+      return {
+        name: current.name,
+        type: current.type
+      };
+    }
+    current = current.parent;
+  }
+  return { name: 'Root', type: 'ROOT' };
+}
+
 function scanLayers(node = figma.currentPage) {
   const layers = [];
 
   function traverse(n) {
     // Only process text nodes
     if (n.type === 'TEXT') {
+      const parentInfo = getParentComponentOrGroup(n);
+
       layers.push({
         id: n.id,
         name: n.name,
         path: getNodePath(n),
         content: n.characters,
-        isGeneric: isGenericName(n.name)
+        isGeneric: isGenericName(n.name),
+        parentComponent: parentInfo.name,
+        parentType: parentInfo.type
       });
     }
 
