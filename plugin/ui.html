@@ -993,7 +993,10 @@
         // Helper functions
         function generateKeyName(screenName, groupName, elementName) {
             const clean = (str) => str.replace(/[^a-zA-Z0-9]/g, '');
-            return `${clean(screenName)}_${clean(groupName)}_${clean(elementName)}`;
+
+            // For text layers, just use "text" as the element name
+            // This keeps keys simple and consistent
+            return `${clean(screenName)}_${clean(groupName)}_text`;
         }
 
         function findDuplicateKeys(keys) {

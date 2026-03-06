@@ -48,21 +48,52 @@ function getParentComponentOrGroup(node) {
         current.type === 'FRAME') {
       return {
         name: current.name,
-        type: current.type
+        type: current.type,
+        id: current.id
       };
     }
     current = current.parent;
   }
-  return { name: 'Root', type: 'ROOT' };
+  return { name: 'Root', type: 'ROOT', id: null };
 }
 
 function scanLayers(node = figma.currentPage) {
   const layers = [];
+  const componentInstanceCounts = new Map(); // Track instances of same component
 
   function traverse(n) {
     // Only process text nodes
     if (n.type === 'TEXT') {
       const parentInfo = getParentComponentOrGroup(n);
+
+      // Generate a unique instance identifier for this parent
+      let parentName = parentInfo.name;
+
+      // If parent is a component instance, number it
+      if (parentInfo.type === 'INSTANCE' || parentInfo.type === 'COMPONENT') {
+        const baseId = parentInfo.id; // Use the node ID to track unique instances
+
+        if (!componentInstanceCounts.has(baseId)) {
+          // First time seeing this instance
+          const baseName = parentInfo.name;
+
+          // Count how many instances of this component name we've seen
+          let instanceNumber = 1;
+          for (const [id, info] of componentInstanceCounts.entries()) {
+            if (info.baseName === baseName) {
+              instanceNumber++;
+            }
+          }
+
+          componentInstanceCounts.set(baseId, {
+            baseName,
+            instanceNumber
+          });
+        }
+
+        const instanceInfo = componentInstanceCounts.get(baseId);
+        parentName = `${instanceInfo.baseName}${instanceInfo.instanceNumber}`;
+      }
 
       layers.push({
         id: n.id,
@@ -70,8 +101,9 @@ function scanLayers(node = figma.currentPage) {
         path: getNodePath(n),
         content: n.characters,
         isGeneric: isGenericName(n.name),
-        parentComponent: parentInfo.name,
-        parentType: parentInfo.type
+        parentComponent: parentName,
+        parentType: parentInfo.type,
+        parentId: parentInfo.id
       });
     }
 
