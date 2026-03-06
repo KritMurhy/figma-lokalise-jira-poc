@@ -10,10 +10,29 @@ class LokaliseClient {
     this.headers = { 'X-Api-Token': this.token };
   }
 
+  async getProjectLanguages() {
+    const response = await axios.get(
+      `${LOKALISE_API}/projects/${this.projectId}/languages`,
+      { headers: this.headers }
+    );
+    return response.data.languages;
+  }
+
   async createKeys(keys) {
+    // Create keys without translations first (safer approach)
+    // Translations can be added via Lokalise UI or updated later
+    const transformedKeys = keys.map(key => ({
+      key_name: key.key_name,
+      platforms: ['web'],
+      description: key.text || ''
+    }));
+
+    console.log('Creating', transformedKeys.length, 'keys without initial translations');
+    console.log('Sample key:', JSON.stringify(transformedKeys[0], null, 2));
+
     const response = await axios.post(
       `${LOKALISE_API}/projects/${this.projectId}/keys`,
-      { keys },
+      { keys: transformedKeys },
       { headers: this.headers }
     );
     return response.data;
@@ -27,18 +46,39 @@ class LokaliseClient {
     return response.data.keys;
   }
 
-  async uploadScreenshot(keyId, screenshotUrl) {
+  async uploadScreenshot(keyIds, base64Image, title = 'Screenshot') {
+    // Upload screenshot and link to keys
     const response = await axios.post(
       `${LOKALISE_API}/projects/${this.projectId}/screenshots`,
       {
         screenshots: [{
-          data: screenshotUrl,
-          title: `Screenshot for key ${keyId}`
+          data: base64Image, // base64 encoded image
+          title: title,
+          key_ids: keyIds,  // Array of key IDs to link to
+          tags: ['figma-export']
         }]
       },
       { headers: this.headers }
     );
     return response.data;
+  }
+
+  async bulkUploadScreenshots(screenshots) {
+    const results = [];
+    for (const screenshot of screenshots) {
+      try {
+        const result = await this.uploadScreenshot(
+          screenshot.keyIds,
+          screenshot.image,
+          screenshot.title
+        );
+        results.push({ success: true, ...result });
+      } catch (error) {
+        console.error('Screenshot upload failed:', error.message);
+        results.push({ success: false, error: error.message });
+      }
+    }
+    return results;
   }
 
   generateKeyName(screenName, groupName, elementName) {

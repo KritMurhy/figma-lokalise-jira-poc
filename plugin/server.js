@@ -23,20 +23,42 @@ const jiraClient = new JiraClient(
 // Export endpoint
 app.post('/api/export', async (req, res) => {
   try {
-    const { keys, screenName, projectKey, epicKey, fileKey } = req.body;
+    const { keys, screenshots, screenName, projectKey, epicKey, fileKey, layerMappings } = req.body;
 
     console.log(`📤 Exporting ${keys.length} keys to Lokalise...`);
 
     // Create keys in Lokalise
     const lokaliseResult = await lokaliseClient.createKeys(keys);
+    const createdKeys = lokaliseResult.keys || [];
     console.log(`✓ Created ${keys.length} keys in Lokalise`);
+
+    // Upload screenshots if provided
+    if (screenshots && screenshots.length > 0) {
+      console.log(`📸 Uploading ${screenshots.length} screenshots...`);
+
+      // Map screenshots to key IDs
+      const screenshotsWithKeyIds = screenshots.map(screenshot => {
+        // Find the created key ID for this screenshot
+        const keyIndex = screenshot.keyIndex;
+        const createdKey = createdKeys[keyIndex];
+
+        return {
+          keyIds: createdKey ? [createdKey.key_id] : [],
+          image: screenshot.image,
+          title: `${screenName} - ${keys[keyIndex].key_name}`
+        };
+      }).filter(s => s.keyIds.length > 0);
+
+      const screenshotResults = await lokaliseClient.bulkUploadScreenshots(screenshotsWithKeyIds);
+      console.log(`✓ Uploaded ${screenshotResults.filter(r => r.success).length}/${screenshots.length} screenshots`);
+    }
 
     // Generate JIRA ticket description
     const figmaUrl = `https://figma.com/file/${fileKey}`;
     const lokaliseUrl = `https://app.lokalise.com/project/${process.env.LOKALISE_PROJECT_ID}`;
 
     const description = jiraClient.generateTicketDescription(
-      keys.map(k => ({ name: k.key_name, text: k.translations[0].translation })),
+      keys.map(k => ({ name: k.key_name, text: k.text })),
       lokaliseUrl,
       figmaUrl,
       screenName
@@ -61,14 +83,20 @@ app.post('/api/export', async (req, res) => {
         url: `${process.env.JIRA_BASE_URL}/browse/${jiraTicket.key}`
       },
       lokaliseUrl,
-      linkedKeys: 0
+      linkedKeys: 0,
+      screenshotsUploaded: screenshots ? screenshots.length : 0,
+      layerMappings: layerMappings || []
     });
 
   } catch (error) {
     console.error('Export error:', error.message);
+    if (error.response) {
+      console.error('Error details:', JSON.stringify(error.response.data, null, 2));
+    }
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      details: error.response?.data
     });
   }
 });

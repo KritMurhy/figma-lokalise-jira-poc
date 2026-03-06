@@ -8,11 +8,5 @@
   "enableProposedApi": false,
   "editorType": [
     "figma"
-  ],
-  "networkAccess": {
-    "allowedDomains": [
-      "https://api.lokalise.com",
-      "https://withplum.atlassian.net"
-    ]
-  }
+  ]
 }

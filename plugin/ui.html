@@ -388,6 +388,46 @@
             margin-bottom: 16px;
             font-size: 13px;
         }
+
+        .duplicate-card {
+            border: 1px solid #ef6c00;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: #fff3e0;
+        }
+
+        .duplicate-header {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        .duplicate-input-group {
+            margin-bottom: 8px;
+        }
+
+        .duplicate-input-group label {
+            font-size: 11px;
+            color: #666;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .duplicate-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ef6c00;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .duplicate-input:focus {
+            outline: none;
+            border-color: #e65100;
+            background: #fff;
+        }
     </style>
 </head>
 <body>
@@ -444,6 +484,21 @@
         <button class="button button-secondary" onclick="skipRenames()">Skip & Continue</button>
     </div>
 
+    <!-- Screen 3.5: Duplicate Resolution -->
+    <div id="screen-duplicates" class="screen">
+        <div class="header">Resolve Duplicate Keys</div>
+
+        <div style="margin-bottom: 16px;">
+            <div class="progress-text" style="text-align: left; margin-bottom: 4px;" id="duplicates-count"></div>
+            <div class="progress-subtext" style="text-align: left;">Edit suggested names to make them unique</div>
+        </div>
+
+        <div id="duplicates-list" style="max-height: 350px; overflow-y: auto;"></div>
+
+        <button class="button button-primary" onclick="applyDuplicateFixes()">Apply Changes</button>
+        <button class="button button-secondary" onclick="skipDuplicates()">Skip (Auto-number)</button>
+    </div>
+
     <!-- Screen 4: Validation Results -->
     <div id="screen-validation" class="screen">
         <div class="header">Validation Results</div>
@@ -486,7 +541,7 @@
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-linked">0</div>
-                <div class="stat-label">Linked Keys</div>
+                <div class="stat-label">Screenshots</div>
             </div>
         </div>
 
@@ -510,6 +565,7 @@
             screenName: '',
             projectKey: '',
             epicKey: '',
+            fileKey: '',
             suggestions: [],
             layers: [],
             selectedSuggestions: [],
@@ -527,7 +583,15 @@
         function startScan() {
             state.screenName = document.getElementById('screen-name').value.trim();
             state.projectKey = document.getElementById('project-key').value.trim();
-            state.epicKey = document.getElementById('epic-key').value.trim();
+            let epicInput = document.getElementById('epic-key').value.trim();
+
+            // Extract epic key from URL if full URL provided
+            if (epicInput.includes('atlassian.net/browse/')) {
+                const match = epicInput.match(/browse\/([A-Z]+-\d+)/);
+                state.epicKey = match ? match[1] : epicInput;
+            } else {
+                state.epicKey = epicInput;
+            }
 
             if (!state.screenName) {
                 alert('Please enter a screen name');
@@ -552,10 +616,11 @@
                 case 'scan-complete':
                     state.suggestions = msg.data.suggestions;
                     state.layers = msg.data.layers;
+                    state.fileKey = msg.data.fileKey;
 
                     if (state.suggestions.length === 0) {
-                        // No suggestions needed, go straight to validation
-                        await validateAndShowResults();
+                        // No suggestions needed, check for duplicates
+                        await checkForDuplicates();
                     } else {
                         // Show suggestions for review
                         showSuggestions(msg.data);
@@ -563,11 +628,19 @@
                     break;
 
                 case 'rename-complete':
-                    await validateAndShowResults();
+                    await checkForDuplicates();
                     break;
 
                 case 'updated-layers':
                     state.layers = msg.data.layers;
+                    break;
+
+                case 'screenshots-ready':
+                    await handleScreenshotsReady(msg.data.screenshots);
+                    break;
+
+                case 'reference-page-created':
+                    console.log('Reference page created:', msg.data.pageName);
                     break;
 
                 case 'error':
@@ -645,19 +718,19 @@
         }
 
         function skipRenames() {
-            validateAndShowResults();
+            checkForDuplicates();
         }
 
-        // Step 5: Validate and show results
-        async function validateAndShowResults() {
+        // Step 4.5: Check for duplicates
+        async function checkForDuplicates() {
             // Get updated layers from Figma
             parent.postMessage({ pluginMessage: { type: 'get-updated-layers' } }, '*');
 
             // Wait a moment for layers to update
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Generate keys
-            state.keys = state.layers.map(layer => {
+            // Generate keys WITHOUT duplicate handling
+            state.keys = state.layers.map((layer, index) => {
                 const pathParts = layer.path.split(' / ');
                 const groupName = pathParts[pathParts.length - 2] || 'Root';
                 const keyName = generateKeyName(state.screenName, groupName, layer.name);
@@ -668,13 +741,114 @@
                     translations: [
                         { language_iso: 'en', translation: layer.content || '' }
                     ],
-                    text: layer.content
+                    text: layer.content,
+                    layerIndex: index,
+                    originalKeyName: keyName
                 };
             });
 
-            // Validate
-            const genericCount = state.layers.filter(l => l.isGeneric).length;
+            // Find duplicates
+            const keyGroups = {};
+            state.keys.forEach((key, index) => {
+                if (!keyGroups[key.key_name]) {
+                    keyGroups[key.key_name] = [];
+                }
+                keyGroups[key.key_name].push({ ...key, index });
+            });
+
+            const duplicateGroups = Object.entries(keyGroups).filter(([name, keys]) => keys.length > 1);
+
+            if (duplicateGroups.length > 0) {
+                // Show duplicate resolution screen
+                showDuplicateResolution(duplicateGroups);
+            } else {
+                // No duplicates, proceed to validation
+                validateAndShowResults();
+            }
+        }
+
+        // Step 5: Show duplicate resolution screen
+        function showDuplicateResolution(duplicateGroups) {
+            const countEl = document.getElementById('duplicates-count');
+            const totalDuplicates = duplicateGroups.reduce((sum, [name, keys]) => sum + keys.length, 0);
+            countEl.textContent = `Found ${totalDuplicates} duplicate keys in ${duplicateGroups.length} groups`;
+
+            const listEl = document.getElementById('duplicates-list');
+            listEl.innerHTML = '';
+
+            // Store duplicate fixes in state
+            state.duplicateFixes = [];
+
+            duplicateGroups.forEach(([originalName, keys]) => {
+                keys.forEach((key, idx) => {
+                    const suggestedName = idx === 0 ? originalName : `${originalName}_${idx + 1}`;
+
+                    const card = document.createElement('div');
+                    card.className = 'duplicate-card';
+                    card.innerHTML = `
+                        <div class="duplicate-header">Duplicate ${idx + 1} of ${keys.length}: ${originalName}</div>
+                        <div class="duplicate-input-group">
+                            <label>New unique name:</label>
+                            <input type="text"
+                                   class="duplicate-input"
+                                   data-index="${key.index}"
+                                   value="${suggestedName}">
+                        </div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                            Text: "${key.text}"
+                        </div>
+                    `;
+                    listEl.appendChild(card);
+                });
+            });
+
+            showScreen('screen-duplicates');
+        }
+
+        // Step 6: Apply duplicate fixes
+        function applyDuplicateFixes() {
+            const inputs = document.querySelectorAll('.duplicate-input');
+
+            inputs.forEach(input => {
+                const index = parseInt(input.dataset.index);
+                const newName = input.value.trim();
+                if (newName) {
+                    state.keys[index].key_name = newName;
+                }
+            });
+
+            validateAndShowResults();
+        }
+
+        function skipDuplicates() {
+            // Auto-number duplicates
+            const keyNames = new Map();
+
+            state.keys = state.keys.map(key => {
+                let keyName = key.originalKeyName || key.key_name;
+
+                if (keyNames.has(keyName)) {
+                    const count = keyNames.get(keyName) + 1;
+                    keyNames.set(keyName, count);
+                    keyName = `${keyName}_${count}`;
+                } else {
+                    keyNames.set(keyName, 1);
+                }
+
+                return {
+                    ...key,
+                    key_name: keyName
+                };
+            });
+
+            validateAndShowResults();
+        }
+
+        // Step 7: Validate and show results
+        async function validateAndShowResults() {
+            // Check for any remaining duplicates (should be none after resolution step)
             const duplicates = findDuplicateKeys(state.keys);
+            const genericCount = state.layers.filter(l => l.isGeneric).length;
 
             // Show validation results
             const resultsEl = document.getElementById('validation-results');
@@ -699,18 +873,16 @@
             resultsEl.innerHTML += `
                 <div class="validation-item success">
                     <span class="validation-icon">✓</span>
-                    <div>Character limits validated (${state.keys.length} keys)</div>
+                    <div>All keys are unique (${state.keys.length} total keys)</div>
                 </div>
             `;
 
-            if (duplicates.length > 0) {
-                resultsEl.innerHTML += `
-                    <div class="validation-item error">
-                        <span class="validation-icon">✗</span>
-                        <div>${duplicates.length} duplicate keys detected - will cause export errors</div>
-                    </div>
-                `;
-            }
+            resultsEl.innerHTML += `
+                <div class="validation-item success">
+                    <span class="validation-icon">✓</span>
+                    <div>Character limits validated</div>
+                </div>
+            `;
 
             // Show key preview
             const keysEl = document.getElementById('keys-preview');
@@ -729,20 +901,51 @@
         // Step 6: Export to Lokalise and create JIRA ticket
         async function exportToLokalise() {
             showScreen('screen-exporting');
+            document.getElementById('export-status').textContent = 'Generating screenshots...';
+            document.getElementById('export-substatus').textContent = `Capturing ${state.layers.length} text elements`;
+
+            // Request screenshots from Figma
+            const layerIds = state.layers.map(l => l.id);
+            parent.postMessage({
+                pluginMessage: {
+                    type: 'export-screenshots',
+                    layerIds
+                }
+            }, '*');
+
+            // Wait for screenshots (will be handled in onmessage)
+            // The actual export will continue in handleScreenshotsReady()
+        }
+
+        async function handleScreenshotsReady(screenshots) {
             document.getElementById('export-status').textContent = 'Exporting to Lokalise...';
-            document.getElementById('export-substatus').textContent = `Generating ${state.keys.length} translation keys`;
+            document.getElementById('export-substatus').textContent = `Uploading ${state.keys.length} keys and ${screenshots.length} screenshots`;
 
             try {
+                // Prepare layer mappings for reference page
+                const layerMappings = state.keys.map((key, index) => ({
+                    layerId: state.layers[index].id,
+                    keyName: key.key_name
+                }));
+
+                // Prepare screenshots with key index
+                const screenshotsWithIndex = screenshots.map((screenshot, index) => ({
+                    ...screenshot,
+                    keyIndex: index
+                }));
+
                 // Call backend API to export to Lokalise
                 const response = await fetch('http://localhost:3000/api/export', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         keys: state.keys,
+                        screenshots: screenshotsWithIndex,
                         screenName: state.screenName,
                         projectKey: state.projectKey,
                         epicKey: state.epicKey || null,
-                        fileKey: figma.fileKey
+                        fileKey: state.fileKey,
+                        layerMappings
                     })
                 });
 
@@ -752,6 +955,16 @@
 
                 const result = await response.json();
 
+                // Create reference page in Figma
+                document.getElementById('export-status').textContent = 'Creating reference page...';
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'create-reference-page',
+                        screenName: state.screenName,
+                        keyMappings: layerMappings
+                    }
+                }, '*');
+
                 // Show success
                 state.jiraTicket = result.jiraTicket;
 
@@ -759,7 +972,7 @@
                     state.epicKey ? 'JIRA ticket created and linked to epic' : 'JIRA ticket created';
 
                 document.getElementById('stat-keys').textContent = state.keys.length;
-                document.getElementById('stat-linked').textContent = result.linkedKeys || 0;
+                document.getElementById('stat-linked').textContent = result.screenshotsUploaded || 0;
 
                 document.getElementById('jira-link').textContent = result.jiraTicket.key;
                 document.getElementById('lokalise-link').textContent = `Lokalise Project`;

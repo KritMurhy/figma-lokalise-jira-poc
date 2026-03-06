@@ -95,7 +95,8 @@ figma.ui.onmessage = async (msg) => {
             totalLayers: layers.length,
             score: score.toFixed(1),
             suggestions,
-            layers
+            layers,
+            fileKey: figma.fileKey
           }
         });
         break;
@@ -125,6 +126,92 @@ figma.ui.onmessage = async (msg) => {
         figma.ui.postMessage({
           type: 'updated-layers',
           data: { layers: updatedLayers }
+        });
+        break;
+
+      case 'export-screenshots':
+        const { layerIds } = msg;
+        const screenshots = [];
+
+        for (const layerId of layerIds) {
+          const node = figma.getNodeById(layerId);
+          if (!node || node.type !== 'TEXT') continue;
+
+          try {
+            // Find the parent frame to export
+            let exportNode = node.parent;
+            while (exportNode && exportNode.type !== 'FRAME' && exportNode.type !== 'COMPONENT') {
+              exportNode = exportNode.parent;
+            }
+
+            if (!exportNode) continue;
+
+            // Create temporary highlight rectangle around the text node
+            const highlight = figma.createRectangle();
+            highlight.resize(node.width + 8, node.height + 8);
+            highlight.x = node.x - 4;
+            highlight.y = node.y - 4;
+            highlight.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 0 }, opacity: 0.3 }]; // Yellow highlight
+            highlight.strokes = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }]; // Red border
+            highlight.strokeWeight = 2;
+            highlight.name = 'temp-highlight';
+
+            // Add to same parent as text node
+            node.parent.appendChild(highlight);
+
+            // Move highlight behind the text
+            const textIndex = node.parent.children.indexOf(node);
+            node.parent.insertChild(textIndex, highlight);
+
+            // Export the frame with the highlight
+            const bytes = await exportNode.exportAsync({
+              format: 'PNG',
+              constraint: { type: 'SCALE', value: 2 }
+            });
+
+            // Remove the highlight
+            highlight.remove();
+
+            // Convert to base64
+            const base64 = figma.base64Encode(bytes);
+
+            screenshots.push({
+              layerId,
+              image: base64
+            });
+          } catch (error) {
+            console.error('Screenshot export failed for', layerId, error);
+          }
+        }
+
+        figma.ui.postMessage({
+          type: 'screenshots-ready',
+          data: { screenshots }
+        });
+        break;
+
+      case 'create-reference-page':
+        const { screenName, keyMappings } = msg;
+
+        // Duplicate current page
+        const currentPage = figma.currentPage;
+        const newPage = currentPage.clone();
+        newPage.name = `${screenName} - Lokalise Keys`;
+
+        // Rename layers according to key mappings
+        keyMappings.forEach(mapping => {
+          const node = newPage.findOne(n => n.id === mapping.layerId);
+          if (node) {
+            node.name = mapping.keyName;
+          }
+        });
+
+        figma.currentPage = newPage;
+        figma.notify(`✨ Created reference page: ${newPage.name}`);
+
+        figma.ui.postMessage({
+          type: 'reference-page-created',
+          data: { pageName: newPage.name }
         });
         break;
 
