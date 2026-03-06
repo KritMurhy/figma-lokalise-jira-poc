@@ -39,13 +39,13 @@ function getNodePath(node) {
 }
 
 function getParentComponentOrGroup(node) {
-  // Find the first parent that is a COMPONENT, INSTANCE, or GROUP
+  // PRIORITY: Find the first COMPONENT or INSTANCE (skip frames/groups)
+  // This ensures we get "Filter Chip" or "Card", not "Text Block" or "BrandName"
   let current = node.parent;
+
+  // First pass: Look for COMPONENT or INSTANCE only
   while (current && current.type !== 'PAGE') {
-    if (current.type === 'COMPONENT' ||
-        current.type === 'INSTANCE' ||
-        current.type === 'GROUP' ||
-        current.type === 'FRAME') {
+    if (current.type === 'COMPONENT' || current.type === 'INSTANCE') {
       return {
         name: current.name,
         type: current.type,
@@ -54,6 +54,20 @@ function getParentComponentOrGroup(node) {
     }
     current = current.parent;
   }
+
+  // Second pass: If no component found, use GROUP or FRAME
+  current = node.parent;
+  while (current && current.type !== 'PAGE') {
+    if (current.type === 'GROUP' || current.type === 'FRAME') {
+      return {
+        name: current.name,
+        type: current.type,
+        id: current.id
+      };
+    }
+    current = current.parent;
+  }
+
   return { name: 'Root', type: 'ROOT', id: null };
 }
 
