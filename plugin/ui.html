@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #ffffff;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none;
+            padding: 20px;
+            height: 600px;
+            overflow-y: auto;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .header {
+            background: #18A0FB;
+            color: white;
+            padding: 16px 20px;
+            margin: -20px -20px 20px -20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .search-box, input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .search-box:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #18A0FB;
+        }
+
+        .option-list {
+            margin-top: 16px;
+        }
+
+        .option-item {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .option-item:hover {
+            border-color: #18A0FB;
+            background: #f0f9ff;
+        }
+
+        .option-item.selected {
+            border-color: #18A0FB;
+            background: #e3f2fd;
+        }
+
+        .option-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .option-subtitle {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+            margin-bottom: 12px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+        }
+
+        .radio-label:hover {
+            background: #f0f9ff;
+            border-color: #18A0FB;
+        }
+
+        .radio-label input {
+            margin-right: 8px;
+        }
+
+        .button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .button-primary {
+            background: #18A0FB;
+            color: white;
+        }
+
+        .button-primary:hover {
+            background: #0D8CE5;
+        }
+
+        .button-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .button-secondary {
+            background: #f0f0f0;
+            color: #333;
+            margin-top: 8px;
+        }
+
+        .button-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .progress-container {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #f0f0f0;
+            border-top-color: #18A0FB;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .progress-subtext {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .suggestion-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: #fafafa;
+        }
+
+        .layer-path {
+            font-size: 11px;
+            color: #999;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 4px;
+        }
+
+        .layer-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .name-badge {
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .name-badge.old {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .name-badge.new {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .arrow {
+            color: #999;
+            font-size: 16px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            margin-right: 6px;
+        }
+
+        .validation-list {
+            margin-top: 20px;
+        }
+
+        .validation-item {
+            display: flex;
+            align-items: start;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .validation-item.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .validation-item.warning {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .validation-item.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .validation-icon {
+            margin-right: 10px;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .success-container {
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .success-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .success-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 8px;
+        }
+
+        .success-subtitle {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #18A0FB;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .link-card {
+            background: #f0f9ff;
+            border: 1px solid #18A0FB;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        .link-title {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .link-url {
+            font-size: 12px;
+            color: #18A0FB;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .summary-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .summary-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .key-list {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 8px;
+        }
+
+        .key-item {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #333;
+            padding: 4px;
+            margin-bottom: 2px;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Screen 1: Epic Selection -->
+    <div id="screen-epic" class="screen active">
+        <div class="header">Lokalise Export</div>
+
+        <div class="input-group">
+            <label class="label">Screen Name</label>
+            <input type="text" id="screen-name" placeholder="e.g., CashISA, Onboarding...">
+        </div>
+
+        <div class="input-group">
+            <label class="label">JIRA Project Key</label>
+            <input type="text" id="project-key" placeholder="e.g., PLAT, MOBILE...">
+        </div>
+
+        <div class="input-group">
+            <label class="label">Link to JIRA Epic (Optional)</label>
+            <input type="text" id="epic-key" placeholder="e.g., PLAT-1917 or leave empty">
+        </div>
+
+        <label class="radio-label">
+            <input type="checkbox" id="no-epic">
+            No epic (standalone ticket, assigned to me)
+        </label>
+
+        <button class="button button-primary" onclick="startScan()">Continue</button>
+        <button class="button button-secondary" onclick="closePlugin()">Cancel</button>
+    </div>
+
+    <!-- Screen 2: Scanning -->
+    <div id="screen-scanning" class="screen">
+        <div class="header">Lokalise Export</div>
+        <div class="progress-container">
+            <div class="spinner"></div>
+            <div class="progress-text">Scanning Figma file...</div>
+            <div class="progress-subtext" id="scan-status">Analyzing layers</div>
+        </div>
+    </div>
+
+    <!-- Screen 3: Suggestions Review -->
+    <div id="screen-suggestions" class="screen">
+        <div class="header">Layer Name Suggestions</div>
+
+        <div style="margin-bottom: 16px;">
+            <div class="progress-text" style="text-align: left; margin-bottom: 4px;" id="suggestions-count"></div>
+            <div class="progress-subtext" style="text-align: left;">Review and approve suggestions below</div>
+        </div>
+
+        <div id="suggestions-list" style="max-height: 350px; overflow-y: auto;"></div>
+
+        <button class="button button-primary" onclick="applyRenames()">Apply Selected</button>
+        <button class="button button-secondary" onclick="skipRenames()">Skip & Continue</button>
+    </div>
+
+    <!-- Screen 4: Validation Results -->
+    <div id="screen-validation" class="screen">
+        <div class="header">Validation Results</div>
+
+        <div class="validation-list" id="validation-results"></div>
+
+        <div class="summary-section">
+            <div class="summary-title">Keys to Export</div>
+            <div class="key-list" id="keys-preview"></div>
+        </div>
+
+        <button class="button button-primary" onclick="exportToLokalise()" style="margin-top: 20px;">Export to Lokalise</button>
+        <button class="button button-secondary" onclick="closePlugin()">Cancel</button>
+    </div>
+
+    <!-- Screen 5: Exporting -->
+    <div id="screen-exporting" class="screen">
+        <div class="header">Lokalise Export</div>
+        <div class="progress-container">
+            <div class="spinner"></div>
+            <div class="progress-text" id="export-status">Exporting to Lokalise...</div>
+            <div class="progress-subtext" id="export-substatus"></div>
+        </div>
+    </div>
+
+    <!-- Screen 6: Success -->
+    <div id="screen-success" class="screen">
+        <div class="header">Lokalise Export</div>
+
+        <div class="success-container">
+            <div class="success-icon">✓</div>
+            <div class="success-title">Export Complete!</div>
+            <div class="success-subtitle" id="success-subtitle"></div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-keys">0</div>
+                <div class="stat-label">Keys Exported</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-linked">0</div>
+                <div class="stat-label">Linked Keys</div>
+            </div>
+        </div>
+
+        <div class="link-card">
+            <div class="link-title">JIRA Ticket</div>
+            <div class="link-url" id="jira-link"></div>
+        </div>
+
+        <div class="link-card">
+            <div class="link-title">Lokalise Project</div>
+            <div class="link-url" id="lokalise-link"></div>
+        </div>
+
+        <button class="button button-primary" onclick="openJiraTicket()">Open JIRA Ticket</button>
+        <button class="button button-secondary" onclick="closePlugin()">Close</button>
+    </div>
+
+    <script>
+        // State management
+        let state = {
+            screenName: '',
+            projectKey: '',
+            epicKey: '',
+            suggestions: [],
+            layers: [],
+            selectedSuggestions: [],
+            keys: [],
+            jiraTicket: null
+        };
+
+        // Screen navigation
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // Step 1: Start scan
+        function startScan() {
+            state.screenName = document.getElementById('screen-name').value.trim();
+            state.projectKey = document.getElementById('project-key').value.trim();
+            state.epicKey = document.getElementById('epic-key').value.trim();
+
+            if (!state.screenName) {
+                alert('Please enter a screen name');
+                return;
+            }
+
+            if (!state.projectKey) {
+                alert('Please enter a JIRA project key');
+                return;
+            }
+
+            showScreen('screen-scanning');
+            parent.postMessage({ pluginMessage: { type: 'scan-file' } }, '*');
+        }
+
+        // Step 2: Handle scan results
+        window.onmessage = async (event) => {
+            const msg = event.data.pluginMessage;
+            if (!msg) return;
+
+            switch (msg.type) {
+                case 'scan-complete':
+                    state.suggestions = msg.data.suggestions;
+                    state.layers = msg.data.layers;
+
+                    if (state.suggestions.length === 0) {
+                        // No suggestions needed, go straight to validation
+                        await validateAndShowResults();
+                    } else {
+                        // Show suggestions for review
+                        showSuggestions(msg.data);
+                    }
+                    break;
+
+                case 'rename-complete':
+                    await validateAndShowResults();
+                    break;
+
+                case 'updated-layers':
+                    state.layers = msg.data.layers;
+                    break;
+
+                case 'error':
+                    alert('Error: ' + msg.data.message);
+                    showScreen('screen-epic');
+                    break;
+            }
+        };
+
+        // Step 3: Show suggestions
+        function showSuggestions(data) {
+            const countEl = document.getElementById('suggestions-count');
+            countEl.textContent = `Found ${data.suggestions.length} layers to rename`;
+
+            const listEl = document.getElementById('suggestions-list');
+            listEl.innerHTML = '';
+
+            state.selectedSuggestions = data.suggestions.map(s => s.id);
+
+            data.suggestions.forEach((suggestion, index) => {
+                const card = document.createElement('div');
+                card.className = 'suggestion-card';
+                card.innerHTML = `
+                    <div class="layer-path">${suggestion.path}</div>
+                    <div class="layer-name">
+                        <span class="name-badge old">${suggestion.oldName}</span>
+                        <span class="arrow">→</span>
+                        <span class="name-badge new">${suggestion.newName}</span>
+                    </div>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-id="${suggestion.id}" checked>
+                        Apply this suggestion
+                    </label>
+                `;
+                listEl.appendChild(card);
+            });
+
+            // Add event listeners to checkboxes
+            listEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const id = e.target.dataset.id;
+                    if (e.target.checked) {
+                        if (!state.selectedSuggestions.includes(id)) {
+                            state.selectedSuggestions.push(id);
+                        }
+                    } else {
+                        state.selectedSuggestions = state.selectedSuggestions.filter(sid => sid !== id);
+                    }
+                });
+            });
+
+            showScreen('screen-suggestions');
+        }
+
+        // Step 4: Apply renames
+        function applyRenames() {
+            const renames = state.suggestions
+                .filter(s => state.selectedSuggestions.includes(s.id))
+                .map(s => ({ id: s.id, newName: s.newName }));
+
+            if (renames.length === 0) {
+                skipRenames();
+                return;
+            }
+
+            showScreen('screen-scanning');
+            document.getElementById('scan-status').textContent = `Renaming ${renames.length} layers...`;
+
+            parent.postMessage({
+                pluginMessage: {
+                    type: 'apply-renames',
+                    renames: renames
+                }
+            }, '*');
+        }
+
+        function skipRenames() {
+            validateAndShowResults();
+        }
+
+        // Step 5: Validate and show results
+        async function validateAndShowResults() {
+            // Get updated layers from Figma
+            parent.postMessage({ pluginMessage: { type: 'get-updated-layers' } }, '*');
+
+            // Wait a moment for layers to update
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Generate keys
+            state.keys = state.layers.map(layer => {
+                const pathParts = layer.path.split(' / ');
+                const groupName = pathParts[pathParts.length - 2] || 'Root';
+                const keyName = generateKeyName(state.screenName, groupName, layer.name);
+
+                return {
+                    key_name: keyName,
+                    platforms: ['web'],
+                    translations: [
+                        { language_iso: 'en', translation: layer.content || '' }
+                    ],
+                    text: layer.content
+                };
+            });
+
+            // Validate
+            const genericCount = state.layers.filter(l => l.isGeneric).length;
+            const duplicates = findDuplicateKeys(state.keys);
+
+            // Show validation results
+            const resultsEl = document.getElementById('validation-results');
+            resultsEl.innerHTML = '';
+
+            if (genericCount === 0) {
+                resultsEl.innerHTML += `
+                    <div class="validation-item success">
+                        <span class="validation-icon">✓</span>
+                        <div>All layer names follow naming convention</div>
+                    </div>
+                `;
+            } else {
+                resultsEl.innerHTML += `
+                    <div class="validation-item warning">
+                        <span class="validation-icon">⚠</span>
+                        <div>${genericCount} layers still have generic names</div>
+                    </div>
+                `;
+            }
+
+            resultsEl.innerHTML += `
+                <div class="validation-item success">
+                    <span class="validation-icon">✓</span>
+                    <div>Character limits validated (${state.keys.length} keys)</div>
+                </div>
+            `;
+
+            if (duplicates.length > 0) {
+                resultsEl.innerHTML += `
+                    <div class="validation-item error">
+                        <span class="validation-icon">✗</span>
+                        <div>${duplicates.length} duplicate keys detected - will cause export errors</div>
+                    </div>
+                `;
+            }
+
+            // Show key preview
+            const keysEl = document.getElementById('keys-preview');
+            keysEl.innerHTML = state.keys
+                .slice(0, 20)
+                .map(k => `<div class="key-item">${k.key_name}</div>`)
+                .join('');
+
+            if (state.keys.length > 20) {
+                keysEl.innerHTML += `<div class="key-item" style="color: #999;">... and ${state.keys.length - 20} more</div>`;
+            }
+
+            showScreen('screen-validation');
+        }
+
+        // Step 6: Export to Lokalise and create JIRA ticket
+        async function exportToLokalise() {
+            showScreen('screen-exporting');
+            document.getElementById('export-status').textContent = 'Exporting to Lokalise...';
+            document.getElementById('export-substatus').textContent = `Generating ${state.keys.length} translation keys`;
+
+            try {
+                // Call backend API to export to Lokalise
+                const response = await fetch('http://localhost:3000/api/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: state.keys,
+                        screenName: state.screenName,
+                        projectKey: state.projectKey,
+                        epicKey: state.epicKey || null,
+                        fileKey: figma.fileKey
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Export failed');
+                }
+
+                const result = await response.json();
+
+                // Show success
+                state.jiraTicket = result.jiraTicket;
+
+                document.getElementById('success-subtitle').textContent =
+                    state.epicKey ? 'JIRA ticket created and linked to epic' : 'JIRA ticket created';
+
+                document.getElementById('stat-keys').textContent = state.keys.length;
+                document.getElementById('stat-linked').textContent = result.linkedKeys || 0;
+
+                document.getElementById('jira-link').textContent = result.jiraTicket.key;
+                document.getElementById('lokalise-link').textContent = `Lokalise Project`;
+
+                showScreen('screen-success');
+
+                parent.postMessage({ pluginMessage: { type: 'export-complete' } }, '*');
+
+            } catch (error) {
+                alert('Export failed: ' + error.message);
+                showScreen('screen-validation');
+            }
+        }
+
+        // Helper functions
+        function generateKeyName(screenName, groupName, elementName) {
+            const clean = (str) => str.replace(/[^a-zA-Z0-9]/g, '');
+            return `${clean(screenName)}_${clean(groupName)}_${clean(elementName)}`;
+        }
+
+        function findDuplicateKeys(keys) {
+            const seen = new Set();
+            const duplicates = [];
+            keys.forEach(k => {
+                if (seen.has(k.key_name)) {
+                    duplicates.push(k.key_name);
+                } else {
+                    seen.add(k.key_name);
+                }
+            });
+            return duplicates;
+        }
+
+        function openJiraTicket() {
+            if (state.jiraTicket) {
+                window.open(`https://withplum.atlassian.net/browse/${state.jiraTicket.key}`, '_blank');
+            }
+        }
+
+        function closePlugin() {
+            parent.postMessage({ pluginMessage: { type: 'close-plugin' } }, '*');
+        }
+
+        // Handle no-epic checkbox
+        document.getElementById('no-epic').addEventListener('change', (e) => {
+            document.getElementById('epic-key').disabled = e.target.checked;
+            if (e.target.checked) {
+                document.getElementById('epic-key').value = '';
+            }
+        });
+    </script>
+</body>
+</html>

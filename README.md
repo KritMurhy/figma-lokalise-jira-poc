@@ -62,6 +62,28 @@ Edit `.env` and add your API tokens:
 
 ## Usage
 
+### Option 1: Figma Plugin (Recommended for POC)
+
+The full POC includes a Figma plugin with visual UI that runs inside Figma.
+
+**See detailed instructions:** [plugin/README.md](plugin/README.md)
+
+**Quick Start:**
+1. Start the backend server:
+   ```bash
+   cd ~/projects/figma-lokalise-jira-poc/plugin
+   node server.js
+   ```
+
+2. Load plugin in Figma:
+   - **Menu** → **Plugins** → **Development** → **Import plugin from manifest**
+   - Select: `~/projects/figma-lokalise-jira-poc/plugin/manifest.json`
+
+3. Run the plugin on your Figma file
+4. Follow the 6-screen workflow
+
+### Option 2: Command Line
+
 Run the workflow from command line:
 
 ```bash
